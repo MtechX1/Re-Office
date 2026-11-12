@@ -60,6 +60,12 @@ describe("desk activity aggregation", () => {
       NOW,
     ).find((item) => item.botId === MANAGER_ID);
     expect(carry).toMatchObject({ workingMsToday: 60 * 60 * 1000, startedToday: 0, updatesToday: 1 });
+
+    const justArrived = summarizeDeskActivity(
+      [line("z", MANAGER_ID, "idle", "Just now", new Date(NOW + 2000).toISOString())],
+      NOW,
+    ).find((item) => item.botId === MANAGER_ID);
+    expect(justArrived).toMatchObject({ updatesToday: 1, quiet: false, currentStatus: "idle" });
   });
 
   it("shows quiet after 24 hours and keeps a fresh floor live", () => {

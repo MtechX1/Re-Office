@@ -217,6 +217,10 @@ function DeskBody({
   }, [seat.slotId, seat.occupantId]);
 
   useEffect(() => {
+    setNow(Date.now());
+  }, [state.statusLog]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
@@ -349,6 +353,9 @@ function ActivityFeed({ state }: { state: OfficeState }) {
   const [floor, setFloor] = useState<FloorId | "all">("all");
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
+    setNow(Date.now());
+  }, [state.statusLog]);
+  useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
@@ -412,6 +419,9 @@ function ActivityFeed({ state }: { state: OfficeState }) {
 
 function UsagePanel({ state }: { state: OfficeState }) {
   const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    setNow(Date.now());
+  }, [state.statusLog]);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);

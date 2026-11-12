@@ -73,8 +73,21 @@ export function recentStatusFeed(lines: readonly StatusLine[], floor: FloorId | 
 }
 
 export function summarizeDeskActivity(lines: readonly StatusLine[], nowMs: number): DeskActivity[] {
-  const dayStart = startOfZonedDay(nowMs);
-  return OFFICE_BOTS.map((bot) => summarizeBot(bot.id, lines, nowMs, dayStart));
+  const asOf = observationTime(lines, nowMs);
+  const dayStart = startOfZonedDay(asOf);
+  return OFFICE_BOTS.map((bot) => summarizeBot(bot.id, lines, asOf, dayStart));
+}
+
+/** Include a message that just arrived if its server clock is slightly ahead of this browser. */
+function observationTime(lines: readonly StatusLine[], nowMs: number): number {
+  const ceiling = nowMs + 5 * 60 * 1000;
+  let latest = nowMs;
+  for (const line of lines) {
+    if (!line.at) continue;
+    const time = Date.parse(line.at);
+    if (Number.isFinite(time) && time > latest && time <= ceiling) latest = time;
+  }
+  return latest;
 }
 
 function summarizeBot(botId: BotId, lines: readonly StatusLine[], nowMs: number, dayStart: number): DeskActivity {
