@@ -116,12 +116,43 @@
 .floor-stage {
   position: relative;
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 0.6rem;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 0.2rem;
   min-height: 7.6rem;
   padding: 0.35rem 0.55rem 0.4rem;
   overflow: visible;
+}
+
+.floor-body {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.floor-badges {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.metric-badge {
+  border: 1px solid #14120f;
+  border-radius: 999px;
+  background: #fffaf3;
+  color: #14120f;
+  font-size: 0.58rem;
+  font-weight: 750;
+  line-height: 1.2;
+  padding: 0.02rem 0.34rem;
+}
+
+.presence[data-status="quiet"] {
+  color: #6b6256;
 }
 
 .floor-stage::before {
@@ -227,12 +258,36 @@
   background: #f3d48a;
 }
 
+.usage-scroll {
+  overflow-x: auto;
+}
+
+.usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.68rem;
+  line-height: 1.3;
+}
+
+.usage-table th,
+.usage-table td {
+  border-bottom: 1px solid #eadfcd;
+  padding: 0.28rem 0.35rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.usage-table th {
+  color: #5c5346;
+  font-weight: 700;
+}
+
 @media (max-width: 720px) {
   .floor-lane {
     grid-template-columns: 4.2rem minmax(0, 1fr);
   }
 
-  .floor-stage {
+  .floor-body {
     flex-direction: column;
     align-items: flex-start;
   }

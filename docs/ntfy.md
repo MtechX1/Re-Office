@@ -6,7 +6,7 @@ Privacy: the page defaults to the office topic `re-LRnhJhxZyV4qdIu7g8bVca` on `h
 curl -sS \
   -H "Accept: application/x-ndjson" \
   --referrer "" \
-  "https://ntfy.sh/YOUR_TOPIC/json?poll=1&since=10m"
+  "https://ntfy.sh/YOUR_TOPIC/json?poll=1&since=24h"
 ```
 
 A status message:
@@ -33,8 +33,9 @@ Other accepted payloads:
 {"type":"groups","groups":[{"id":"studio","name":"Studio","bots":["RE Media Studio"]}]}
 {"type":"chat","bot":"RE Office Manager","text":"Example note","url":"https://example.test/not-opened"}
 {"type":"routines","bot":"RE Market Research","routines":[{"id":"morning","name":"Morning note"}]}
+{"routines":{"bot":"RE Media Studio","items":["Cut reel","Grade color"]}}
 ```
 
 Chat `url` values are shown as text and are not opened. Routine payloads are stored inactive and are not scheduled. Bots outside the seven-seat allowlist are dropped, including older names on the same shared channel.
 
-The app polls history for `since=10m` (at most 200 lines) and then keeps one live `/{topic}/json` tail. HTTP 429 uses `Retry-After` when it is longer than the backoff, and never retries sooner than 5 seconds.
+The app polls history for `since=24h` and then keeps one live `/{topic}/json` tail. The activity feed shows the newest 100 status lines. HTTP 429 uses `Retry-After` when it is longer than the backoff, and never retries sooner than 5 seconds.

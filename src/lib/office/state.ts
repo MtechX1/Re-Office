@@ -1,4 +1,5 @@
 import { botById, matchBot, type BotId } from "@/lib/office/allowlist";
+import { STATUS_LOG_LIMIT, type StatusLine } from "@/lib/office/activity";
 import { assignSeat, initialSeats, type Seat } from "@/lib/office/assignments";
 import { ROUTINES_ENABLED } from "@/lib/office/definitions";
 import type { ParsedMessage } from "@/lib/ntfy/parser";
@@ -6,8 +7,8 @@ import { shouldOpenInboundUrl } from "@/lib/ntfy/parser";
 import type { SlotId } from "@/lib/office/definitions";
 
 const ACTIVITY_LIMIT = 80;
-const SEEN_LIMIT = 300;
-const ROUTINE_LIMIT = 20;
+const SEEN_LIMIT = 1500;
+const ROUTINE_LIMIT = 80;
 
 export interface ActivityEntry {
   id: string;
@@ -32,6 +33,7 @@ export interface OfficeState {
   looks: Partial<Record<BotId, { label: string; note: string }>>;
   groups: { id: string; name: string; botIds: BotId[] }[];
   activity: ActivityEntry[];
+  statusLog: StatusLine[];
   usage: UsageSnapshot | null;
   inactiveRoutines: { id: string; name: string; botId: BotId | null }[];
   routinesEnabled: false;
@@ -52,6 +54,7 @@ export function createOfficeState(): OfficeState {
     looks: {},
     groups: [],
     activity: [],
+    statusLog: [],
     usage: null,
     inactiveRoutines: [],
     routinesEnabled: ROUTINES_ENABLED,
@@ -109,6 +112,13 @@ function applyStatus(
     return { ...state, suppressedCount: state.suppressedCount + 1 };
   }
   const bot = botById(match.botId);
+  const statusLine: StatusLine = {
+    id: meta.eventId,
+    botId: match.botId,
+    status: message.status,
+    step: message.step,
+    at: meta.receivedAt,
+  };
   return pushActivity(
     {
       ...state,
@@ -116,6 +126,7 @@ function applyStatus(
         ...state.statuses,
         [match.botId]: { status: message.status, step: message.step },
       },
+      statusLog: [...state.statusLog, statusLine].slice(-STATUS_LOG_LIMIT),
     },
     {
       id: meta.eventId,
@@ -283,7 +294,10 @@ function applyRoutines(
     name: routine.name,
     botId,
   }));
-  const inactiveRoutines = [...stored, ...state.inactiveRoutines].slice(0, ROUTINE_LIMIT);
+  const inactiveRoutines = [
+    ...stored,
+    ...state.inactiveRoutines.filter((routine) => routine.botId !== botId),
+  ].slice(0, ROUTINE_LIMIT);
   const who = botId ? botById(botId).name : "the office";
   return pushActivity(
     { ...state, inactiveRoutines, routinesEnabled: false },

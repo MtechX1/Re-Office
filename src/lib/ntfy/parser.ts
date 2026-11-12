@@ -82,6 +82,9 @@ export function parseOfficePayload(value: unknown): OfficeParse {
   if (type === undefined && "status" in value && "bot" in value && "step" in value) {
     return parseStatus(value);
   }
+  if (type === undefined && isRecord(value.routines)) {
+    return parseRoutineBundle(value.routines);
+  }
   if (typeof type !== "string") return fail("unknown-type");
 
   switch (type) {
@@ -190,6 +193,9 @@ function parseChat(value: Record<string, unknown>): OfficeParse {
 }
 
 function parseRoutines(value: Record<string, unknown>): OfficeParse {
+  if (isRecord(value.routines) && !Array.isArray(value.routines)) {
+    return parseRoutineBundle(value.routines);
+  }
   if (!Array.isArray(value.routines) || value.routines.length === 0 || value.routines.length > 20) {
     return fail("invalid-shape");
   }
@@ -205,6 +211,38 @@ function parseRoutines(value: Record<string, unknown>): OfficeParse {
     const id = requiredText(entry.id, 40);
     const name = requiredText(entry.name, 80);
     if (!id || !name || !SAFE_ID.test(id)) return fail("invalid-shape");
+    routines.push({ id, name });
+  }
+  return { ok: true, message: { kind: "routines", bot, routines } };
+}
+
+/** `{ routines: { bot, items } }` — latest list for one bot. Items are not scheduled. */
+function parseRoutineBundle(bundle: Record<string, unknown>): OfficeParse {
+  if (hasForbiddenKey(bundle)) return fail("invalid-shape");
+  let bot: string | null = null;
+  if (bundle.bot !== undefined && bundle.bot !== null) {
+    const cleaned = requiredText(bundle.bot, 80);
+    if (!cleaned) return fail("invalid-shape");
+    bot = cleaned;
+  }
+  if (!Array.isArray(bundle.items) || bundle.items.length === 0 || bundle.items.length > 20) {
+    return fail("invalid-shape");
+  }
+  const routines: { id: string; name: string }[] = [];
+  for (let index = 0; index < bundle.items.length; index += 1) {
+    const entry = bundle.items[index];
+    const fallbackId = `item-${index + 1}`;
+    if (typeof entry === "string") {
+      const name = requiredText(entry, 80);
+      if (!name) return fail("invalid-shape");
+      routines.push({ id: fallbackId, name });
+      continue;
+    }
+    if (!isRecord(entry) || hasForbiddenKey(entry)) return fail("invalid-shape");
+    const name = requiredText(entry.name ?? entry.title ?? entry.label, 80);
+    if (!name) return fail("invalid-shape");
+    const rawId = entry.id === undefined ? fallbackId : requiredText(entry.id, 40);
+    const id = rawId && SAFE_ID.test(rawId) ? rawId : fallbackId;
     routines.push({ id, name });
   }
   return { ok: true, message: { kind: "routines", bot, routines } };

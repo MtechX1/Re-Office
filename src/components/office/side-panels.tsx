@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { botById, chatLinkForBot, OFFICE_BOTS, type BotId } from "@/lib/office/allowlist";
+import { useEffect, useMemo, useState } from "react";
+import { botById, chatLinkForBot, OFFICE_BOTS, type BotId, type FloorId } from "@/lib/office/allowlist";
 import { canAssign, type Seat } from "@/lib/office/assignments";
 import { servicesOnFloor } from "@/lib/adapters/placeholders";
 import { botRequiresMlsSetup, MLS_SETUP_INPUTS } from "@/lib/office/mls";
-import { slotById, STAVROS, type SlotId } from "@/lib/office/definitions";
+import { FLOORS, slotById, STAVROS, type SlotId } from "@/lib/office/definitions";
+import {
+  formatOfficeTime,
+  formatWorkingDuration,
+  recentStatusFeed,
+  summarizeDeskActivity,
+} from "@/lib/office/activity";
 import type { OfficeState } from "@/lib/office/state";
 import { formatStreamPhase, type PublicPhase } from "@/lib/ntfy/stream";
 import { DEFAULT_NTFY_BASE } from "@/lib/ntfy/topic";
@@ -74,6 +80,7 @@ export function SidePanels({
       <DeskDetail state={state} onAssign={onAssign} onRestore={onRestore} />
       <ActivityFeed state={state} />
       <UsagePanel state={state} />
+      <RoutinesPanel state={state} />
     </div>
   );
 }
@@ -203,10 +210,16 @@ function DeskBody({
 }) {
   const slot = slotById(seat.slotId);
   const [choice, setChoice] = useState(seat.occupantId && seat.occupantId !== "stavros" ? seat.occupantId : "");
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     setChoice(seat.occupantId && seat.occupantId !== "stavros" ? seat.occupantId : "");
   }, [seat.slotId, seat.occupantId]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   if (seat.occupantId === "stavros") {
     return (
@@ -222,6 +235,9 @@ function DeskBody({
 
   const bot = seat.occupantId ? botById(seat.occupantId) : null;
   const status = bot ? state.statuses[bot.id] : undefined;
+  const quiet = bot
+    ? (summarizeDeskActivity(state.statusLog, now).find((row) => row.botId === bot.id)?.quiet ?? true)
+    : false;
   const look = bot ? state.looks[bot.id] : undefined;
   const groups = bot ? state.groups.filter((group) => group.botIds.includes(bot.id)) : [];
   const services = servicesOnFloor(slot.floorId);
@@ -247,7 +263,7 @@ function DeskBody({
           >
             Copy chat link
           </Button>
-          <p>{status ? `${status.status} · ${status.step}` : "No status received."}</p>
+          <p>{quiet || !status ? "quiet" : `${status.status} · ${status.step}`}</p>
           <p>{look ? `${look.label}. ${look.note}` : "No look description received."}</p>
           {groups.length > 0 ? (
             <ul>
@@ -330,41 +346,64 @@ function MlsChecklist() {
 }
 
 function ActivityFeed({ state }: { state: OfficeState }) {
+  const [floor, setFloor] = useState<FloorId | "all">("all");
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const rows = useMemo(() => recentStatusFeed(state.statusLog, floor, now), [state.statusLog, floor, now]);
+
   return (
     <Card>
       <CardHeader className="p-4">
         <CardTitle className="font-display text-lg">Activity</CardTitle>
-        <CardDescription>Empty until a validated message arrives for a bot on this roster.</CardDescription>
+        <CardDescription>Newest status lines first. The page backfills the last 24 hours.</CardDescription>
       </CardHeader>
-      <CardContent className="p-4 pt-0">
-        {state.activity.length === 0 ? (
-          <p className="text-sm leading-6 text-[#3f382f]">
-            No validated messages yet. This list stays empty until the shared stream delivers one. Nothing here is
-            sample activity.
-          </p>
-        ) : (
-          <ul className="space-y-3">
-            {state.activity.map((entry) => (
-              <li key={entry.id} className="border-b border-[#eadfcd] pb-3 text-sm leading-6 last:border-0">
-                <p>{entry.text}</p>
-                {entry.envelopeTime ? <p className="text-xs text-[#5c5346]">Envelope time {entry.envelopeTime}</p> : null}
-                {entry.url ? (
-                  <p className="break-all text-xs text-[#5c5346]">Link text received, not opened: {entry.url}</p>
-                ) : null}
-              </li>
+      <CardContent className="space-y-3 p-4 pt-0">
+        <div className="space-y-1.5">
+          <Label htmlFor="activity-floor">Floor</Label>
+          <select
+            id="activity-floor"
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+            value={floor}
+            onChange={(event) => setFloor(event.target.value as FloorId | "all")}
+          >
+            <option value="all">All floors</option>
+            {FLOORS.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
             ))}
+          </select>
+        </div>
+        {rows.length === 0 ? (
+          <p className="text-sm leading-6 text-[#3f382f]">No status lines for this floor in the loaded history.</p>
+        ) : (
+          <ul className="space-y-3" data-activity-feed>
+            {rows.map((entry) => {
+              const bot = botById(entry.botId);
+              return (
+                <li
+                  key={entry.id}
+                  className="border-b border-[#eadfcd] pb-3 text-sm leading-6 last:border-0"
+                  data-activity-row
+                  data-bot={bot.name}
+                  data-status={entry.status}
+                  data-floor={bot.floorId}
+                >
+                  <p className="text-xs text-[#5c5346]">{formatOfficeTime(entry.at)}</p>
+                  <p>
+                    {bot.name} · {entry.status}
+                  </p>
+                  <p>{entry.step}</p>
+                </li>
+              );
+            })}
           </ul>
         )}
         {state.suppressedCount > 0 ? (
-          <p className="mt-3 text-xs leading-5 text-[#5c5346]">
-            Some shared-channel messages were left out of this office.
-          </p>
-        ) : null}
-        {state.inactiveRoutines.length > 0 ? (
-          <p className="mt-3 text-xs leading-5 text-[#5c5346]">
-            {state.inactiveRoutines.length} routine payload{state.inactiveRoutines.length === 1 ? "" : "s"} stored
-            inactive. Routines are off.
-          </p>
+          <p className="text-xs leading-5 text-[#5c5346]">Status lines from other bot names are left out of this office.</p>
         ) : null}
       </CardContent>
     </Card>
@@ -372,36 +411,96 @@ function ActivityFeed({ state }: { state: OfficeState }) {
 }
 
 function UsagePanel({ state }: { state: OfficeState }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const rows = useMemo(() => summarizeDeskActivity(state.statusLog, now), [state.statusLog, now]);
+
   return (
     <Card>
       <CardHeader className="p-4">
         <CardTitle className="font-display text-lg">Usage</CardTitle>
-        <CardDescription>No percentages are estimated.</CardDescription>
+        <CardDescription>Counted in this browser from today&apos;s status lines. America/New_York.</CardDescription>
       </CardHeader>
-      <CardContent className="p-4 pt-0 text-sm leading-6">
+      <CardContent className="space-y-3 p-4 pt-0 text-sm leading-6">
+        <div className="usage-scroll">
+          <table className="usage-table" data-usage-table>
+            <thead>
+              <tr>
+                <th>Bot</th>
+                <th>Seen</th>
+                <th>Status</th>
+                <th>Upd</th>
+                <th>Start</th>
+                <th>Done</th>
+                <th>Err</th>
+                <th>Working</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.botId} data-usage-bot={row.name}>
+                  <td>{row.name}</td>
+                  <td>{formatOfficeTime(row.lastSeenAt)}</td>
+                  <td data-usage-status>{row.quiet ? "quiet" : row.currentStatus}</td>
+                  <td data-usage-updates>{row.updatesToday}</td>
+                  <td data-usage-started>{row.startedToday}</td>
+                  <td data-usage-done>{row.doneToday}</td>
+                  <td data-usage-errors>{row.errorsToday}</td>
+                  <td data-usage-working>{formatWorkingDuration(row.workingMsToday)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {state.usage === null ? (
-          <p>No usage payload has been received.</p>
+          <p className="text-xs leading-5 text-[#5c5346]">No usage-percentage payload has been received.</p>
         ) : (
-          <div className="space-y-2">
-            <p>total_used_pct: {state.usage.totalUsedPct}</p>
-            <p>resets_at: {state.usage.resetsAt}</p>
-            {state.usage.bots.length === 0 ? (
-              <p>No allowlisted bot rows were in this payload.</p>
-            ) : (
-              <ul>
-                {state.usage.bots.map((bot) => (
-                  <li key={bot.botId}>
-                    {botById(bot.botId).name}: {bot.usedPct}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {state.usage.omittedRows > 0 ? (
-              <p className="text-xs text-[#5c5346]">
-                Bot rows outside this office were omitted. The total above is the received total, unchanged.
-              </p>
-            ) : null}
-          </div>
+          <p className="text-xs leading-5 text-[#5c5346]">
+            Received usage payload: total_used_pct {state.usage.totalUsedPct}, resets_at {state.usage.resetsAt}.
+            {state.usage.omittedRows > 0 ? " Rows outside this office were omitted." : ""}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function RoutinesPanel({ state }: { state: OfficeState }) {
+  const grouped = new Map<string, { name: string; items: string[] }>();
+  for (const routine of state.inactiveRoutines) {
+    const key = routine.botId ?? "office";
+    const name = routine.botId ? botById(routine.botId).name : "Office";
+    const current = grouped.get(key) ?? { name, items: [] };
+    current.items.push(routine.name);
+    grouped.set(key, current);
+  }
+  const lists = [...grouped.values()];
+
+  return (
+    <Card>
+      <CardHeader className="p-4">
+        <CardTitle className="font-display text-lg">Routines</CardTitle>
+        <CardDescription>Latest list per bot. Nothing here is scheduled.</CardDescription>
+      </CardHeader>
+      <CardContent className="p-4 pt-0 text-sm leading-6" data-routines-panel>
+        {lists.length === 0 ? (
+          <p>No routine list has arrived.</p>
+        ) : (
+          <ul className="space-y-3">
+            {lists.map((list) => (
+              <li key={list.name} data-routines-bot={list.name}>
+                <p className="font-medium">{list.name}</p>
+                <ul className="list-disc pl-4">
+                  {list.items.map((item, index) => (
+                    <li key={`${item}-${index}`}>{item}</li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
         )}
       </CardContent>
     </Card>

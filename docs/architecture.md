@@ -28,7 +28,7 @@ src/components/office/      floor model, geometric occupants, desk detail, feed,
 6. Research — RE Market Research. Commercial and residential market analysis, neighborhoods, and valuations. Same Northeast Florida MLS required input, not connected.
 7. Media — RE Media Studio.
 
-Each confirmed seat draws a seated geometric figure in the floor model. The figure is part of the viewer, not a photo and not a looks payload. Its color identifies the person. A missing status stays "No status received" and does not change that color. Stavros is the round-headed human figure. The seven bots have hexagonal heads. Empty local arrangements show a dashed chair and no figure.
+Each confirmed seat draws a seated geometric figure in the floor model. The figure is part of the viewer, not a photo and not a looks payload. Its color identifies the person. A floor with no status in the last 24 hours shows "quiet" and does not recolor the figure. Stavros is the round-headed human figure. The seven bots have hexagonal heads. Empty local arrangements show a dashed chair and no figure.
 
 Each bot has a chat link `grokbot://app/v1/agent?id=<id>`. Inbound ntfy URLs are rendered as text and are never opened.
 
@@ -40,7 +40,7 @@ A roster payload cannot create a new desk. Usage rows for anyone else are omitte
 
 ## Stream
 
-There is one shared topic, not a topic per bot. The browser polls `https://<host>/<topic>/json?poll=1&since=10m`, then keeps a single NDJSON tail. Fetch is used instead of `EventSource` so an HTTP 429 is visible. Retries wait at least 5 seconds, then 10, 20, 40, 80, and 120 seconds, and they honor a longer `Retry-After` up to 15 minutes. A live socket does not mark any desk online. Status text appears only after a validated status message.
+There is one shared topic, not a topic per bot. The browser polls `https://<host>/<topic>/json?poll=1&since=24h`, then keeps a single NDJSON tail. Fetch is used instead of `EventSource` so an HTTP 429 is visible. Retries wait at least 5 seconds, then 10, 20, 40, 80, and 120 seconds, and they honor a longer `Retry-After` up to 15 minutes. A live socket does not mark any desk online. Status text appears only after a validated message from one of the seven bots.
 
 Routines can be parsed and stored as inactive text. `routinesEnabled` stays false. Nothing is scheduled.
 

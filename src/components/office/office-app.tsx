@@ -78,7 +78,7 @@ export function OfficeApp() {
     void runSharedStream({
       baseUrl: base,
       topic: activeTopic,
-      since: "10m",
+      since: "24h",
       signal: controller.signal,
       hooks: {
         fetch: globalThis.fetch.bind(globalThis),

@@ -31,7 +31,7 @@ Open [http://127.0.0.1:43123/Re-Office/](http://127.0.0.1:43123/Re-Office/). `np
 
 - The site is static. There is no server route. The office topic is in the page, and a fragment can replace it for one visit.
 - The visitor's browser must be allowed to call the ntfy host (CORS). `https://ntfy.sh` allows that. Another https host has to send the same kind of CORS headers.
-- History is the last 10 minutes, capped at 200 lines, then one live tail.
+- History is the last 24 hours, then one live tail. The feed shows the newest 100 status lines.
 - HTTP 429 waits at least 5 seconds. Desks stay without a status until a real message arrives.
 - BoldTrail, Vulcan 7, Crexi, LoopNet, and Northeast Florida MLS are not connected. There is no login and no import.
 - Routines are not run.

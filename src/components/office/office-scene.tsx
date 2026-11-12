@@ -1,6 +1,12 @@
+import { useEffect, useState } from "react";
 import { botById, type BotId, type FloorId } from "@/lib/office/allowlist";
 import { servicesOnFloor } from "@/lib/adapters/placeholders";
 import type { Seat } from "@/lib/office/assignments";
+import {
+  formatWorkingDuration,
+  summarizeDeskActivity,
+  type DeskActivity,
+} from "@/lib/office/activity";
 import { FLOORS, slotsForFloor } from "@/lib/office/definitions";
 import { figureForOccupant, presenceLabel } from "@/lib/office/figures";
 import type { OfficeState } from "@/lib/office/state";
@@ -26,6 +32,13 @@ export function OfficeScene({
   onYaw: (yaw: number) => void;
   onSelect: (slotId: Seat["slotId"]) => void;
 }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const activity = summarizeDeskActivity(state.statusLog, now);
+
   return (
     <div className="office-column">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
@@ -52,6 +65,7 @@ export function OfficeScene({
             .map((slot) => state.seats.find((seat) => seat.slotId === slot.id))
             .filter((seat): seat is Seat => Boolean(seat));
           const services = servicesOnFloor(floor.id);
+          const summary = activity.find((row) => row.floorId === floor.id) ?? null;
           return (
             <section key={floor.id} className="floor-lane" data-floor={floor.id} aria-labelledby={`floor-${floor.id}`}>
               <div className="floor-label">
@@ -62,9 +76,19 @@ export function OfficeScene({
                 <p className="floor-kicker">{floor.kicker}</p>
               </div>
               <div className="floor-stage">
+                {summary ? <FloorBadges summary={summary} /> : null}
+                <div className="floor-body">
                 <div className="floor-cast">
                   {seats.map((seat) => (
-                    <DeskStation key={seat.slotId} seat={seat} floorId={floor.id} selected={state.selectedSlotId === seat.slotId} state={state} onSelect={onSelect} />
+                    <DeskStation
+                      key={seat.slotId}
+                      seat={seat}
+                      floorId={floor.id}
+                      selected={state.selectedSlotId === seat.slotId}
+                      state={state}
+                      summary={summary}
+                      onSelect={onSelect}
+                    />
                   ))}
                 </div>
                 {services.length > 0 ? (
@@ -76,6 +100,7 @@ export function OfficeScene({
                     ))}
                   </div>
                 ) : null}
+                </div>
               </div>
             </section>
           );
@@ -85,25 +110,51 @@ export function OfficeScene({
   );
 }
 
+function FloorBadges({ summary }: { summary: DeskActivity }) {
+  const presence = summary.quiet ? "quiet" : summary.currentStatus ?? "quiet";
+  return (
+    <div className="floor-badges" data-floor-badges={summary.floorId}>
+      <span className="metric-badge" data-metric="presence">
+        {presence}
+      </span>
+      <span className="metric-badge" data-metric="updates">
+        {summary.updatesToday} today
+      </span>
+      <span className="metric-badge" data-metric="tasks">
+        {summary.startedToday} started · {summary.doneToday} done
+      </span>
+      <span className="metric-badge" data-metric="errors">
+        {summary.errorsToday} errors
+      </span>
+      <span className="metric-badge" data-metric="working">
+        {formatWorkingDuration(summary.workingMsToday)} working
+      </span>
+    </div>
+  );
+}
+
 function DeskStation({
   seat,
   floorId,
   selected,
   state,
+  summary,
   onSelect,
 }: {
   seat: Seat;
   floorId: FloorId;
   selected: boolean;
   state: OfficeState;
+  summary: DeskActivity | null;
   onSelect: (slotId: Seat["slotId"]) => void;
 }) {
   const figure = figureForOccupant(seat.occupantId);
   const bot = seat.occupantId && seat.occupantId !== "stavros" ? botById(seat.occupantId as BotId) : null;
   const kind = seat.occupantId === "stavros" ? "human" : seat.occupantId ? "bot" : "empty";
   const status = bot ? state.statuses[bot.id] : undefined;
+  const quiet = kind === "bot" && (summary?.quiet ?? true);
   const label = figure?.name ?? "Unassigned";
-  const presence = presenceLabel(kind, status);
+  const presence = quiet ? "quiet" : presenceLabel(kind, status);
   const slotTitle = slotsForFloor(floorId).find((slot) => slot.id === seat.slotId)?.title ?? seat.slotId;
 
   return (
@@ -120,7 +171,7 @@ function DeskStation({
         {label}
       </span>
       <span className="seat-role">{seat.occupantId === "stavros" ? "Human caller" : bot?.lane ?? slotTitle}</span>
-      <span className="presence" data-status={status ? status.status : "unknown"}>
+      <span className="presence" data-status={quiet ? "quiet" : status ? status.status : "unknown"}>
         {presence}
       </span>
     </button>

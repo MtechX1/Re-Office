@@ -19,7 +19,7 @@ export interface StreamHooks {
   jitterMs?: () => number;
 }
 
-const HISTORY_LINE_CAP = 200;
+const HISTORY_LINE_CAP = 1000;
 
 export function formatStreamPhase(phase: PublicPhase): string {
   switch (phase.phase) {
@@ -70,7 +70,7 @@ export async function runSharedStream(options: {
   const jitter = options.hooks.jitterMs ?? (() => 0);
   let attempt = 0;
   let historyDone = false;
-  let since = options.since || "10m";
+  let since = options.since || "24h";
 
   while (!options.signal.aborted) {
     options.hooks.onPhase({ phase: "connecting", attempt });
