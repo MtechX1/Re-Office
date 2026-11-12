@@ -1,0 +1,38 @@
+{
+  "name": "re-office-viewer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Static viewer for Stavros's real estate office. Building this package does not deploy it.",
+  "scripts": {
+    "dev": "NEXT_TELEMETRY_DISABLED=1 next dev",
+    "build": "NEXT_TELEMETRY_DISABLED=1 next build",
+    "test": "vitest run",
+    "lint": "NEXT_TELEMETRY_DISABLED=1 eslint",
+    "preview:static": "python3 -m http.server 43123 --directory out --bind 127.0.0.1",
+    "start": "node -e \"console.error('This viewer is a static export. This script does not deploy it. See docs/hosting.md'); process.exit(1)\""
+  },
+  "dependencies": {
+    "@radix-ui/react-label": "^2.1.17",
+    "@radix-ui/react-separator": "^1.2.0",
+    "@radix-ui/react-slot": "^1.5.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.71.0",
+    "next": "^15.5.29",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "tailwind-merge": "^3.7.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "^15.5.29",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^3.2.7"
+  }
+}
