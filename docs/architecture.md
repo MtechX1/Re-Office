@@ -14,8 +14,10 @@ src/lib/ntfy/parser.ts      untrusted JSON
 src/lib/ntfy/stream.ts      history poll, then one live tail
 src/lib/ntfy/backoff.ts     429 and reconnect delays
 src/lib/ntfy/topic.ts       fragment and browser settings
-src/lib/office/figures.ts   seated figure colors, independent of ntfy status
-src/components/office/      floor model, geometric occupants, desk detail, feed, usage
+src/lib/office/figures.ts   figure colors and silhouettes, independent of ntfy status
+src/lib/office/motion.ts    status to bounce, bubble, particles, and quiet
+src/lib/office/scene-layout.ts floor labels, stack, desk pads
+src/components/office/      isometric office, terminal panels, feed, usage
 ```
 
 ## Floors
@@ -28,7 +30,7 @@ src/components/office/      floor model, geometric occupants, desk detail, feed,
 6. Research — RE Market Research. Commercial and residential market analysis, neighborhoods, and valuations. Same Northeast Florida MLS required input, not connected.
 7. Media — RE Media Studio.
 
-Each confirmed seat draws a seated geometric figure in the floor model. The figure is part of the viewer, not a photo and not a looks payload. Its color identifies the person. A floor with no status in the last 24 hours shows "quiet" and does not recolor the figure. Stavros is the round-headed human figure. The seven bots have hexagonal heads. Empty local arrangements show a dashed chair and no figure.
+Each confirmed seat is a matte figure on a round desk pad in the isometric office. The figure is part of the viewer, not a photo and not a looks payload. Its color and silhouette identify the person. Quiet (no status in 24 hours) dims that figure and holds it still. Stavros is the human figure with a phone. Empty local arrangements show a pad and a laptop and no figure. The camera stays at a fixed isometric angle. Drag pans and the wheel zooms.
 
 Each bot has a chat link `grokbot://app/v1/agent?id=<id>`. Inbound ntfy URLs are rendered as text and are never opened.
 

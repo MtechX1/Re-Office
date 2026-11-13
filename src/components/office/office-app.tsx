@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { OfficeScene } from "@/components/office/office-scene";
 import { SidePanels } from "@/components/office/side-panels";
+import type { IsoSnapshot } from "@/components/office/iso-types";
 import { loadArrangement, saveArrangement } from "@/lib/office/assignments";
+import { summarizeDeskActivity } from "@/lib/office/activity";
+import type { FloorId } from "@/lib/office/allowlist";
 import {
   applyInbound,
   assignOfficeSeat,
@@ -12,7 +15,7 @@ import {
   selectSlot,
   type OfficeState,
 } from "@/lib/office/state";
-import { abortableSleep, formatStreamPhase, runSharedStream, type PublicPhase } from "@/lib/ntfy/stream";
+import { abortableSleep, runSharedStream, type PublicPhase } from "@/lib/ntfy/stream";
 import {
   DEFAULT_NTFY_BASE,
   DEFAULT_OFFICE_TOPIC,
@@ -34,8 +37,13 @@ export function OfficeApp() {
   const [reveal, setReveal] = useState(false);
   const [topicError, setTopicError] = useState<string | null>(null);
   const [baseError, setBaseError] = useState<string | null>(null);
-  const [yaw, setYaw] = useState(0);
   const [started, setStarted] = useState(false);
+  const [focusFloor, setFocusFloor] = useState<FloorId | null>(null);
+  const [explode, setExplode] = useState(false);
+  const [night, setNight] = useState(false);
+  const [panelsOpen, setPanelsOpen] = useState(true);
+  const [clientReady, setClientReady] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const skipArrangementSave = useRef(true);
 
   useEffect(() => {
@@ -55,7 +63,18 @@ export function OfficeApp() {
     if (TOPIC_PATTERN.test(nextTopic)) setActiveTopic(nextTopic);
     const seats = loadArrangement(window.localStorage);
     if (seats) setState((current) => ({ ...current, seats }));
+    if (window.matchMedia("(max-width: 860px)").matches) setPanelsOpen(false);
+    setClientReady(true);
     setStarted(true);
+  }, []);
+
+  useEffect(() => {
+    setNow(Date.now());
+  }, [state.statusLog]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -91,6 +110,16 @@ export function OfficeApp() {
     });
     return () => controller.abort();
   }, [started, activeTopic, baseUrl]);
+
+  const rows = useMemo(() => summarizeDeskActivity(state.statusLog, now), [state.statusLog, now]);
+  const snapshot: IsoSnapshot = {
+    seats: state.seats,
+    selectedSlotId: state.selectedSlotId,
+    rows,
+    explode,
+    night,
+    focusFloor,
+  };
 
   function listen() {
     const base = validateBaseUrl(baseUrl);
@@ -130,59 +159,53 @@ export function OfficeApp() {
   }
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-[#d5c6aa] bg-[#f7f1e6]/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-5 sm:px-6">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="font-display text-xs uppercase tracking-[0.22em] text-[#8c6a32]">Stavros</p>
-              <h1 className="font-display text-3xl leading-none sm:text-4xl">RE Office</h1>
-            </div>
-            <p className="max-w-xl text-sm leading-6 text-[#3f382f]">{formatStreamPhase(phase)}</p>
-          </div>
-          <p className="max-w-3xl text-sm leading-6 text-[#5c5346]">
-            Commercial and residential. Seven confirmed desks, one shared stream, and no live connection to BoldTrail,
-            Vulcan 7, Crexi, LoopNet, or Northeast Florida MLS.
-          </p>
-        </div>
-      </header>
-      <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-        <div className="lg:col-start-2 lg:row-start-1">
-          <SidePanels
-            state={state}
-            phase={phase}
-            baseUrl={baseUrl}
-            draftTopic={draftTopic}
-            remember={remember}
-            reveal={reveal}
-            topicError={topicError}
-            baseError={baseError}
-            onBaseUrl={(value) => {
-              setBaseUrl(value);
-              setBaseError(null);
-            }}
-            onDraftTopic={(value) => {
-              setDraftTopic(value);
-              setTopicError(null);
-            }}
-            onRemember={setRemember}
-            onReveal={setReveal}
-            onListen={listen}
-            onStop={stop}
-            onForget={forget}
-            onAssign={(slotId, botId) => setState((current) => assignOfficeSeat(current, slotId, botId))}
-            onRestore={() => setState((current) => restoreRoster(current))}
-          />
-        </div>
-        <div className="lg:col-start-1 lg:row-start-1">
-          <OfficeScene
-            state={state}
-            yaw={yaw}
-            onYaw={setYaw}
-            onSelect={(slotId) => setState((current) => selectSlot(current, slotId))}
-          />
-        </div>
-      </main>
+    <div
+      className={`iso-app${clientReady ? " iso-client" : ""}`}
+      data-panels={panelsOpen ? "open" : "closed"}
+      data-office-model="isometric"
+    >
+      <h1 className="sr-only">Stavros RE Office</h1>
+      <OfficeScene
+        state={state}
+        snapshot={snapshot}
+        onSelect={(slotId) => setState((current) => selectSlot(current, slotId))}
+        onAssign={(slotId, botId) => setState((current) => assignOfficeSeat(current, slotId, botId))}
+      />
+      <SidePanels
+        state={state}
+        rows={rows}
+        now={now}
+        phase={phase}
+        focusFloor={focusFloor}
+        explode={explode}
+        night={night}
+        panelsOpen={panelsOpen}
+        baseUrl={baseUrl}
+        draftTopic={draftTopic}
+        remember={remember}
+        reveal={reveal}
+        topicError={topicError}
+        baseError={baseError}
+        onBaseUrl={(value) => {
+          setBaseUrl(value);
+          setBaseError(null);
+        }}
+        onDraftTopic={(value) => {
+          setDraftTopic(value);
+          setTopicError(null);
+        }}
+        onRemember={setRemember}
+        onReveal={setReveal}
+        onListen={listen}
+        onStop={stop}
+        onForget={forget}
+        onSelect={(slotId) => setState((current) => selectSlot(current, slotId))}
+        onFocusFloor={setFocusFloor}
+        onExplode={setExplode}
+        onNight={setNight}
+        onPanels={setPanelsOpen}
+        onRestore={() => setState((current) => restoreRoster(current))}
+      />
     </div>
   );
 }

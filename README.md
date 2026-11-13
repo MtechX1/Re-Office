@@ -51,7 +51,7 @@ The page stores a fragment topic in the browser and removes the fragment. A `?to
 | Research | RE Market Research | `2d5decd1-e475-4c78-9281-85fc6baca121` |
 | Media | RE Media Studio | `8a76c58f-cbf6-478b-93df-75075e074916` |
 
-Chat links use `grokbot://app/v1/agent?id=<id>`. The viewer shows them as text. It does not open them by itself.
+Chat links use `grokbot://app/v1/agent?id=<id>`. A bot panel includes that link. The viewer does not open inbound ntfy URLs.
 
 Stavros is the human caller for commercial and residential work. Vulcan 7 is his personal dialer. It is not automated, and the viewer has no dial control.
 

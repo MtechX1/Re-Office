@@ -1,182 +1,232 @@
-import { useEffect, useState } from "react";
-import { botById, type BotId, type FloorId } from "@/lib/office/allowlist";
-import { servicesOnFloor } from "@/lib/adapters/placeholders";
-import type { Seat } from "@/lib/office/assignments";
-import {
-  formatWorkingDuration,
-  summarizeDeskActivity,
-  type DeskActivity,
-} from "@/lib/office/activity";
-import { FLOORS, slotsForFloor } from "@/lib/office/definitions";
-import { figureForOccupant, presenceLabel } from "@/lib/office/figures";
-import type { OfficeState } from "@/lib/office/state";
-import { BotFigure, EmptyChair } from "@/components/office/bot-figure";
+"use client";
 
-function chipText(product: string): string {
-  if (product === "BoldTrail") return "BoldTrail · CRM · not connected";
-  if (product === "Vulcan 7") return "Vulcan 7 · personal dialer · not automated";
-  if (product === "LoopNet") return "LoopNet · comps and inventory · not connected";
-  if (product === "Crexi") return "Crexi · not connected";
-  if (product === "Northeast Florida MLS") return "Northeast Florida MLS · access required · not connected";
-  return `${product} · not connected`;
-}
+import { useEffect, useRef, useState } from "react";
+import type { BotId } from "@/lib/office/allowlist";
+import { botById, chatLinkForBot, OFFICE_BOTS } from "@/lib/office/allowlist";
+import { formatOfficeTime, formatWorkingDuration, type DeskActivity } from "@/lib/office/activity";
+import { canAssign, type Seat } from "@/lib/office/assignments";
+import { slotById, type SlotId } from "@/lib/office/definitions";
+import { figureForOccupant } from "@/lib/office/figures";
+import type { IsoSnapshot, ProjectPoint } from "@/components/office/iso-types";
+import { botRequiresMlsSetup } from "@/lib/office/mls";
+import { statusTone } from "@/lib/office/motion";
+import { stackedFloors } from "@/lib/office/scene-layout";
+import type { OfficeState } from "@/lib/office/state";
+
+const FLOOR_STACK = stackedFloors();
 
 export function OfficeScene({
   state,
-  yaw,
-  onYaw,
+  snapshot,
   onSelect,
+  onAssign,
 }: {
   state: OfficeState;
-  yaw: number;
-  onYaw: (yaw: number) => void;
-  onSelect: (slotId: Seat["slotId"]) => void;
+  snapshot: IsoSnapshot;
+  onSelect: (slotId: SlotId | null) => void;
+  onAssign: (slotId: SlotId, botId: BotId) => void;
 }) {
-  const [now, setNow] = useState(() => Date.now());
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const calloutRef = useRef<HTMLDivElement>(null);
+  const lineRef = useRef<SVGLineElement>(null);
+  const snapshotRef = useRef(snapshot);
+  const onSelectRef = useRef(onSelect);
+  snapshotRef.current = snapshot;
+  onSelectRef.current = onSelect;
+  const [webgl, setWebgl] = useState<boolean | null>(null);
+
   useEffect(() => {
-    setNow(Date.now());
-  }, [state.statusLog]);
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
-    return () => window.clearInterval(timer);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    let dead = false;
+    let dispose = () => {};
+    void import("@/components/office/iso-world").then((mod) => {
+      if (dead || !canvasRef.current) return;
+      dispose = mod.mountIsoOffice(canvasRef.current, {
+        getSnapshot: () => snapshotRef.current,
+        onSelect: (slotId) => onSelectRef.current(slotId),
+        onProject: (point) => placeCallout(point, canvasRef.current, calloutRef.current, lineRef.current),
+        onContext: (ok) => {
+          if (!dead) setWebgl(ok);
+        },
+      });
+    });
+    return () => {
+      dead = true;
+      dispose();
+    };
   }, []);
-  const activity = summarizeDeskActivity(state.statusLog, now);
+
+  const seat = state.seats.find((item) => item.slotId === state.selectedSlotId) ?? null;
 
   return (
-    <div className="office-column">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="font-display text-xs uppercase tracking-[0.22em] text-[#8c6a32]">Model</p>
-          <h2 className="font-display text-2xl text-[#1c1915]">Seven floors, each with a seated figure</h2>
-        </div>
-        <label className="flex min-w-48 flex-1 items-center gap-3 text-sm text-[#5c5346] sm:max-w-xs">
-          <span className="shrink-0">Tilt floors</span>
-          <input
-            type="range"
-            min={-18}
-            max={18}
-            value={yaw}
-            onChange={(event) => onYaw(Number(event.target.value))}
-            aria-label="Tilt the floor planks"
-            className="w-full accent-[#1e3a32]"
+    <>
+      <canvas
+        ref={canvasRef}
+        className="iso-canvas"
+        data-office-model="isometric"
+        aria-label="Isometric office. Drag to pan, scroll to zoom."
+      />
+      <svg className="iso-connector" aria-hidden="true">
+        <line ref={lineRef} />
+      </svg>
+      <div ref={calloutRef} className="iso-callout term" data-bot-panel data-show="0">
+        {seat ? (
+          <SeatCallout
+            seat={seat}
+            rows={snapshot.rows}
+            look={seat.occupantId && seat.occupantId !== "stavros" ? state.looks[seat.occupantId] : undefined}
+            onSelect={onSelect}
+            onAssign={onAssign}
           />
-        </label>
+        ) : null}
       </div>
-      <div className="office-stage" data-office-model="building" style={{ ["--yaw" as string]: `${yaw}deg` }}>
-        {FLOORS.map((floor) => {
-          const seats = slotsForFloor(floor.id)
-            .map((slot) => state.seats.find((seat) => seat.slotId === slot.id))
-            .filter((seat): seat is Seat => Boolean(seat));
-          const services = servicesOnFloor(floor.id);
-          const summary = activity.find((row) => row.floorId === floor.id) ?? null;
-          return (
-            <section key={floor.id} className="floor-lane" data-floor={floor.id} aria-labelledby={`floor-${floor.id}`}>
-              <div className="floor-label">
-                <span className="floor-num">{String(floor.order).padStart(2, "0")}</span>
-                <h3 id={`floor-${floor.id}`} className="floor-name">
-                  {floor.name}
-                </h3>
-                <p className="floor-kicker">{floor.kicker}</p>
-              </div>
-              <div className="floor-stage">
-                {summary ? <FloorBadges summary={summary} /> : null}
-                <div className="floor-body">
-                <div className="floor-cast">
-                  {seats.map((seat) => (
-                    <DeskStation
-                      key={seat.slotId}
-                      seat={seat}
-                      floorId={floor.id}
-                      selected={state.selectedSlotId === seat.slotId}
-                      state={state}
-                      summary={summary}
-                      onSelect={onSelect}
-                    />
-                  ))}
-                </div>
-                {services.length > 0 ? (
-                  <div className="floor-sources">
-                    {services.map((service) => (
-                      <p key={service.id} className={`source-chip ${service.centerpiece ? "source-chip-center" : ""}`}>
-                        {chipText(service.product)}
-                      </p>
-                    ))}
-                  </div>
-                ) : null}
-                </div>
-              </div>
-            </section>
-          );
-        })}
-      </div>
-    </div>
+      {webgl === false ? (
+        <p className="iso-fallback">This browser could not start the 3D office. The floor list still tracks the stream.</p>
+      ) : null}
+    </>
   );
 }
 
-function FloorBadges({ summary }: { summary: DeskActivity }) {
-  const presence = summary.quiet ? "quiet" : summary.currentStatus ?? "quiet";
-  return (
-    <div className="floor-badges" data-floor-badges={summary.floorId}>
-      <span className="metric-badge" data-metric="presence">
-        {presence}
-      </span>
-      <span className="metric-badge" data-metric="updates">
-        {summary.updatesToday} today
-      </span>
-      <span className="metric-badge" data-metric="tasks">
-        {summary.startedToday} started · {summary.doneToday} done
-      </span>
-      <span className="metric-badge" data-metric="errors">
-        {summary.errorsToday} errors
-      </span>
-      <span className="metric-badge" data-metric="working">
-        {formatWorkingDuration(summary.workingMsToday)} working
-      </span>
-    </div>
-  );
+function placeCallout(
+  point: ProjectPoint | null,
+  canvas: HTMLCanvasElement | null,
+  callout: HTMLDivElement | null,
+  line: SVGLineElement | null,
+) {
+  if (!callout || !line || !canvas) return;
+  if (!point) {
+    callout.dataset.show = "0";
+    line.style.display = "none";
+    return;
+  }
+  callout.dataset.show = "1";
+  const width = callout.offsetWidth || 260;
+  const height = callout.offsetHeight || 180;
+  const margin = 8;
+  let left = point.x + 26;
+  if (left + width > canvas.clientWidth - margin) left = point.x - width - 26;
+  left = Math.max(margin, Math.min(left, canvas.clientWidth - width - margin));
+  let top = point.y - height * 0.35;
+  top = Math.max(margin, Math.min(top, canvas.clientHeight - height - margin));
+  callout.style.left = `${left}px`;
+  callout.style.top = `${top}px`;
+  const anchorX = left > point.x ? left : left + width;
+  line.style.display = "";
+  line.setAttribute("x1", String(point.x));
+  line.setAttribute("y1", String(point.y));
+  line.setAttribute("x2", String(anchorX));
+  line.setAttribute("y2", String(top + 18));
 }
 
-function DeskStation({
+function SeatCallout({
   seat,
-  floorId,
-  selected,
-  state,
-  summary,
+  rows,
+  look,
   onSelect,
+  onAssign,
 }: {
   seat: Seat;
-  floorId: FloorId;
-  selected: boolean;
-  state: OfficeState;
-  summary: DeskActivity | null;
-  onSelect: (slotId: Seat["slotId"]) => void;
+  rows: DeskActivity[];
+  look: { label: string; note: string } | undefined;
+  onSelect: (slotId: SlotId | null) => void;
+  onAssign: (slotId: SlotId, botId: BotId) => void;
 }) {
+  const slot = slotById(seat.slotId);
+  const floor = FLOOR_STACK.find((item) => item.id === slot.floorId);
   const figure = figureForOccupant(seat.occupantId);
-  const bot = seat.occupantId && seat.occupantId !== "stavros" ? botById(seat.occupantId as BotId) : null;
-  const kind = seat.occupantId === "stavros" ? "human" : seat.occupantId ? "bot" : "empty";
-  const status = bot ? state.statuses[bot.id] : undefined;
-  const quiet = kind === "bot" && (summary?.quiet ?? true);
-  const label = figure?.name ?? "Unassigned";
-  const presence = quiet ? "quiet" : presenceLabel(kind, status);
-  const slotTitle = slotsForFloor(floorId).find((slot) => slot.id === seat.slotId)?.title ?? seat.slotId;
+  const bot = seat.occupantId && seat.occupantId !== "stavros" ? botById(seat.occupantId) : null;
+  const row = bot ? rows.find((item) => item.botId === bot.id) : undefined;
+  const quiet = bot ? (row?.quiet ?? true) : false;
+  const statusText =
+    seat.occupantId === "stavros" ? "human caller" : bot ? (quiet ? "quiet" : (row?.currentStatus ?? "quiet")) : "empty";
+  const tone = seat.occupantId === "stavros" ? "info" : statusTone(row?.currentStatus ?? null, quiet || !bot);
+  const step = seat.occupantId === "stavros" ? "Vulcan 7 manual, not automated" : row?.currentStep || "—";
+  const today = row
+    ? `${row.updatesToday} upd · ${row.startedToday} start · ${row.doneToday} done · ${row.errorsToday} err · ${formatWorkingDuration(row.workingMsToday)}`
+    : "—";
 
   return (
-    <button
-      type="button"
-      className="station"
-      data-occupant={seat.occupantId ?? ""}
-      data-floor-seat={seat.slotId}
-      aria-pressed={selected}
-      onClick={() => onSelect(seat.slotId)}
-    >
-      {figure ? <BotFigure spec={figure} /> : <EmptyChair />}
-      <span className="nameplate" title={label}>
-        {label}
-      </span>
-      <span className="seat-role">{seat.occupantId === "stavros" ? "Human caller" : bot?.lane ?? slotTitle}</span>
-      <span className="presence" data-status={quiet ? "quiet" : status ? status.status : "unknown"}>
-        {presence}
-      </span>
-    </button>
+    <>
+      <button type="button" className="callout-close" onClick={() => onSelect(null)} aria-label="Close bot panel">
+        x
+      </button>
+      <div className="kv">
+        <span className="k">name</span>
+        <span>{figure?.name ?? "Unassigned"}</span>
+        <span className="k">floor</span>
+        <span>{floor?.label ?? slot.floorId}</span>
+        <span className="k">status</span>
+        <span className={tone}>{statusText}</span>
+        <span className="k">step</span>
+        <span className="info">{step}</span>
+        <span className="k">seen</span>
+        <span>{bot ? formatOfficeTime(row?.lastSeenAt ?? null) : "—"}</span>
+        <span className="k">today</span>
+        <span>{today}</span>
+      </div>
+      {bot ? (
+        <p>
+          <button
+            type="button"
+            onClick={() => {
+              window.location.assign(chatLinkForBot(bot.id));
+            }}
+          >
+            open chat
+          </button>
+          <span className="info"> {chatLinkForBot(bot.id)}</span>
+        </p>
+      ) : null}
+      {look ? (
+        <p className="info">
+          {look.label}. {look.note}
+        </p>
+      ) : null}
+      {bot && botRequiresMlsSetup(bot.id) ? (
+        <p className="info">Northeast Florida MLS access required. Not connected.</p>
+      ) : null}
+      <SeatAssign seat={seat} onAssign={onAssign} />
+    </>
+  );
+}
+
+function SeatAssign({
+  seat,
+  onAssign,
+}: {
+  seat: Seat;
+  onAssign: (slotId: SlotId, botId: BotId) => void;
+}) {
+  const [choice, setChoice] = useState(seat.occupantId && seat.occupantId !== "stavros" ? seat.occupantId : "");
+  useEffect(() => {
+    setChoice(seat.occupantId && seat.occupantId !== "stavros" ? seat.occupantId : "");
+  }, [seat.slotId, seat.occupantId]);
+  if (seat.occupantId === "stavros" || seat.locked) {
+    return seat.locked ? <p className="dim">Confirmed seat. RE Office Manager stays here.</p> : null;
+  }
+  const eligible = OFFICE_BOTS.filter((candidate) => canAssign(candidate.id, seat.slotId));
+  return (
+    <details>
+      <summary>seat</summary>
+      <label htmlFor="seat-bot">Local assignment</label>
+      <select id="seat-bot" value={choice} onChange={(event) => setChoice(event.target.value)}>
+        <option value="">Leave unassigned</option>
+        {eligible.map((candidate) => (
+          <option key={candidate.id} value={candidate.id}>
+            {candidate.name}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        disabled={!choice}
+        onClick={() => {
+          if (choice) onAssign(seat.slotId, choice as BotId);
+        }}
+      >
+        Seat this bot
+      </button>
+    </details>
   );
 }
