@@ -173,6 +173,7 @@ function TeamStatus({
     <section className="term">
       <h2>team status</h2>
       {FLOOR_STACK.map((floor) => {
+        const defined = FLOORS.find((item) => item.id === floor.id);
         const seats = slotsForFloor(floor.id)
           .map((slot) => state.seats.find((seat) => seat.slotId === slot.id))
           .filter((seat): seat is Seat => Boolean(seat));
@@ -206,6 +207,11 @@ function TeamStatus({
                 </button>
               );
             })}
+            {floor.id === "media" && defined ? (
+              <p className="info" data-media-role>
+                {defined.summary}
+              </p>
+            ) : null}
             {services.map((service) => (
               <p key={service.id} className="info">
                 {service.product} · {service.role} · not connected

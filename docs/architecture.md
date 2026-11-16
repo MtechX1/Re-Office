@@ -28,7 +28,7 @@ src/components/office/      isometric office, terminal panels, feed, usage
 4. Marketing — RE Marketing Desk. Ads, social, email, and content.
 5. Transactions — RE Closing Desk. Contracts and closings.
 6. Research — RE Market Research. Commercial and residential market analysis, neighborhoods, and valuations. Same Northeast Florida MLS required input, not connected.
-7. Media — RE Media Studio.
+7. Media — RE Media Studio, the single creative floor. Photo and video edits, short captioned clips, and other creative pieces.
 
 Each confirmed seat is a matte figure on a round desk pad in the isometric office. The figure is part of the viewer, not a photo and not a looks payload. Its color and silhouette identify the person. Quiet (no status in 24 hours) dims that figure and holds it still. Stavros is the human figure with a phone. Empty local arrangements show a pad and a laptop and no figure. The camera stays at a fixed isometric angle. Drag pans and the wheel zooms.
 
@@ -36,7 +36,7 @@ Each bot has a chat link `grokbot://app/v1/agent?id=<id>`. Inbound ntfy URLs are
 
 ## Allowlist
 
-Messages whose bot field is not one of the seven names or ids are dropped. That includes older roster members listed only in `src/lib/office/allowlist.ts`: Signal Prospector, Clip Bot, Visuals Bot, Pipeline Pulse, Stavy's Re Closer, Transaction Bot, Hollywood Bot, and RE HQ Coordinator (`63630cda-0d74-428a-a066-f5ae66bbcba3`). Leaving them off this building does not delete them anywhere else.
+Messages whose bot field is not one of the seven names or ids are dropped. That includes older roster members listed only in `src/lib/office/allowlist.ts`: Signal Prospector, Clip Bot, Visuals Bot, Pipeline Pulse, Stavy's Re Closer, Transaction Bot, Hollywood Bot, and RE HQ Coordinator (`63630cda-0d74-428a-a066-f5ae66bbcba3`). Clip Bot and Visuals Bot are ignored. Their status is not copied onto RE Media Studio, and they do not get a figure. Hollywood Bot stays out of the office and is not shown on the Media floor. Leaving them off this building does not delete them anywhere else.
 
 A roster payload cannot create a new desk. Usage rows for anyone else are omitted. The received `total_used_pct` is kept as sent.
 

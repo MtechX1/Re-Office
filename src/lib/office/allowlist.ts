@@ -61,8 +61,9 @@ export const OFFICE_BOTS = [
     name: "RE Media Studio",
     floorId: "media",
     lane: "Media",
-    role: "Media studio",
-    summary: "Media floor lane.",
+    role: "Photo and video edits, short captioned clips, and other creative pieces",
+    summary:
+      "Single creative floor for photo and video edits, short captioned clips, and other creative pieces.",
   },
 ] as const;
 
@@ -78,7 +79,12 @@ export const CLOSING_DESK_ID = "4be523e7-0852-47d0-859e-efc51c4e8335" satisfies 
 export const MARKET_RESEARCH_ID = "2d5decd1-e475-4c78-9281-85fc6baca121" satisfies BotId;
 export const MEDIA_STUDIO_ID = "8a76c58f-cbf6-478b-93df-75075e074916" satisfies BotId;
 
-/** Kept out of this building. Not deleted anywhere else. */
+/**
+ * Kept out of this building. Not deleted anywhere else.
+ * Clip Bot and Visuals Bot are ignored on the shared feed. Their lines are not
+ * rewritten onto RE Media Studio and they do not get a desk or a figure.
+ * Hollywood Bot is Instagram only and is not a seat on the Media floor.
+ */
 export const EXCLUDED_BOTS = [
   { name: "Signal Prospector", ids: [] as readonly string[] },
   { name: "Clip Bot", ids: [] as readonly string[] },

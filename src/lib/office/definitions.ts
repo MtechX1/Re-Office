@@ -60,7 +60,7 @@ export const FLOORS = [
     order: 7,
     name: "Media",
     kicker: "Studio",
-    summary: "Media studio floor.",
+    summary: "Photo and video edits, short captioned clips, and other creative pieces.",
     sectors: [] as readonly Sector[],
   },
 ] as const satisfies readonly {

@@ -19,6 +19,19 @@ describe("office state", () => {
     expect(Object.keys(state.statuses)).toHaveLength(0);
   });
 
+  it("ignores Clip Bot, Visuals Bot, and Hollywood Bot instead of seating them on Media", () => {
+    for (const [index, name] of ["Clip Bot", "Visuals Bot", "Hollywood Bot"].entries()) {
+      const next = apply(
+        { kind: "status", bot: name, status: "working", step: "Should stay off the media floor" },
+        `creative-${index}`,
+      );
+      expect(next.statuses[MEDIA_STUDIO_ID]).toBeUndefined();
+      expect(next.activity).toEqual([]);
+      expect(next.seats.find((seat) => seat.slotId === "media.desk")?.occupantId).toBe(MEDIA_STUDIO_ID);
+      expect(JSON.stringify(next)).not.toContain(name);
+    }
+  });
+
   it("records an allowlisted status and ignores older bots", () => {
     const allowed = apply({
       kind: "status",

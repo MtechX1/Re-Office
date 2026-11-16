@@ -17,6 +17,11 @@ describe("desk figures", () => {
       expect(figureForOccupant(bot.id)).toMatchObject({ name: bot.name, shape: "bot", posture: "seated" });
     }
     expect(Object.keys(FIGURES)).toHaveLength(8);
+    const names = Object.values(FIGURES).map((figure) => figure.name);
+    expect(names).toContain("RE Media Studio");
+    expect(names).not.toContain("Clip Bot");
+    expect(names).not.toContain("Visuals Bot");
+    expect(names).not.toContain("Hollywood Bot");
   });
 
   it("covers all seven floors and leaves unknown status unknown", () => {

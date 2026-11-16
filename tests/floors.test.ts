@@ -136,6 +136,55 @@ describe("floor roster", () => {
     expect(canAssign(MEDIA_STUDIO_ID, "listings.desk")).toBe(true);
   });
 
+  it("keeps Media as the single creative floor and leaves the other floors seated as before", () => {
+    const creative = "Photo and video edits, short captioned clips, and other creative pieces";
+    const mediaBots = OFFICE_BOTS.filter((bot) => bot.floorId === "media");
+    expect(mediaBots.map((bot) => bot.name)).toEqual(["RE Media Studio"]);
+    expect(mediaBots[0]).toMatchObject({
+      id: MEDIA_STUDIO_ID,
+      role: creative,
+      summary: "Single creative floor for photo and video edits, short captioned clips, and other creative pieces.",
+    });
+    expect(FLOORS.find((floor) => floor.id === "media")?.summary).toBe(`${creative}.`);
+    expect(SLOTS.filter((slot) => slot.floorId === "media").map((slot) => ({ id: slot.id, title: slot.title }))).toEqual([
+      { id: "media.desk", title: "RE Media Studio" },
+    ]);
+    expect(initialSeats().find((seat) => seat.slotId === "media.desk")?.occupantId).toBe(MEDIA_STUDIO_ID);
+
+    const seated = OFFICE_BOTS.map((bot) => bot.name);
+    for (const name of ["Clip Bot", "Visuals Bot", "Hollywood Bot"]) {
+      expect(seated).not.toContain(name);
+      expect(matchBot(name)).toEqual({ result: "excluded" });
+      expect(EXCLUDED_BOTS.some((bot) => bot.name === name)).toBe(true);
+    }
+    expect(EXCLUDED_BOTS.map((bot) => bot.name)).toEqual(
+      expect.arrayContaining(["Signal Prospector", "Pipeline Pulse", "Clip Bot", "Visuals Bot", "Hollywood Bot"]),
+    );
+
+    expect(OFFICE_BOTS.map((bot) => ({ floorId: bot.floorId, name: bot.name, role: bot.role }))).toEqual([
+      { floorId: "hq", name: "RE Office Manager", role: "Office manager" },
+      {
+        floorId: "leads",
+        name: "RE Leads Watch",
+        role: "Watch BoldTrail for new leads and flag them for Stavros",
+      },
+      {
+        floorId: "listings",
+        name: "RE Listings Desk",
+        role: "Commercial and residential comps, listing prep, photos, and descriptions",
+      },
+      { floorId: "marketing", name: "RE Marketing Desk", role: "Ads, social, email, and content" },
+      { floorId: "transactions", name: "RE Closing Desk", role: "Contracts and closings" },
+      {
+        floorId: "research",
+        name: "RE Market Research",
+        role: "Commercial and residential market analysis, neighborhoods, and valuations",
+      },
+      { floorId: "media", name: "RE Media Studio", role: creative },
+    ]);
+    expect(initialSeats().find((seat) => seat.slotId === "leads.caller")?.occupantId).toBe("stavros");
+  });
+
   it("rejects older roster names and the retired coordinator id", () => {
     for (const bot of EXCLUDED_BOTS) {
       expect(matchBot(bot.name).result).toBe("excluded");

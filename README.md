@@ -61,6 +61,8 @@ RE Listings Desk covers commercial and residential comps, listing prep, photos, 
 
 RE Market Research covers commercial and residential market analysis, neighborhoods, and valuations. It also names Northeast Florida MLS.
 
+RE Media Studio is the only seat on the Media floor. It covers photo and video edits, short captioned clips, and other creative pieces.
+
 Northeast Florida MLS is a required setup input for those two desks. The provider is known. Access is not connected. The viewer has no password, username, or token field and no MLS login.
 
 Older bots are excluded from this building only. They are not deleted elsewhere. Their names live in `src/lib/office/allowlist.ts` so a shared channel cannot seat them here.

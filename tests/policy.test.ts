@@ -50,6 +50,7 @@ describe("viewer policy", () => {
     ]) {
       expect(visible).not.toContain(name);
     }
+    expect(visible).toContain("data-media-role");
     expect(visible).not.toContain("dangerouslySetInnerHTML");
     expect(visible).not.toContain("window.open");
     expect(visible).not.toContain("<a ");

@@ -3,6 +3,7 @@
 ## Decided
 
 - The office has these seven bots, one per floor: RE Office Manager, RE Leads Watch, RE Listings Desk, RE Marketing Desk, RE Closing Desk, RE Market Research, RE Media Studio.
+- Media is the single creative floor. RE Media Studio covers photo and video edits, short captioned clips, and other creative pieces. Clip Bot and Visuals Bot are not seated, and messages under those names are ignored. Hollywood Bot is not part of this office.
 - Stavros is the human caller and covers commercial and residential work.
 - The leads CRM name is BoldTrail. The card is a placeholder and is not connected. RE Leads Watch is not shown as live monitoring.
 - Vulcan 7 is Stavros's personal dialer. It is not automated. The viewer has no dial control.

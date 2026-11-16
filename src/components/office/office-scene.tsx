@@ -164,6 +164,12 @@ function SeatCallout({
         <span>{bot ? formatOfficeTime(row?.lastSeenAt ?? null) : "—"}</span>
         <span className="k">today</span>
         <span>{today}</span>
+        {bot && slot.floorId === "media" ? (
+          <>
+            <span className="k">role</span>
+            <span data-media-role>{bot.role}</span>
+          </>
+        ) : null}
       </div>
       {bot ? (
         <p>
